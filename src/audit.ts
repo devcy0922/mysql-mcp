@@ -4,7 +4,7 @@ import type { AuditIdentity } from "./auth/authorization.js";
 
 export interface AuditEvent {
   domain: string;
-  operation: "list_domains" | "list_tables" | "describe_table" | "select";
+  operation: "list_domains" | "list_tables" | "describe_table" | "select" | "insert" | "delete";
   table?: string;
   requestedLimit?: number;
   resultCount?: number;

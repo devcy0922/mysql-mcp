@@ -63,3 +63,40 @@ export function buildSelectQuery(input: SelectInput): BuiltQuery {
     values: [...conditions.flatMap(({ values }) => values), input.limit],
   };
 }
+
+export function buildInsertQuery(table: string, record: Record<string, unknown>): BuiltQuery {
+  const keys = Object.keys(record);
+  if (keys.length === 0) {
+    throw new Error("삽입할 레코드에 하나 이상의 필드가 필요합니다.");
+  }
+  if (keys.length > 50) {
+    throw new Error("한 번에 삽입할 수 있는 필드는 최대 50개입니다.");
+  }
+  const columns = keys.map(quoteIdentifier).join(", ");
+  const placeholders = keys.map(() => "?").join(", ");
+  const values = keys.map((k) => {
+    const val = record[k];
+    if (typeof val === "object" && val !== null && !(val instanceof Date)) {
+      return JSON.stringify(val);
+    }
+    return val as any;
+  });
+  return {
+    sql: `INSERT INTO ${quoteTableIdentifier(table)} (${columns}) VALUES (${placeholders})`,
+    values,
+  };
+}
+
+export function buildDeleteQuery(table: string, where: WhereCondition[]): BuiltQuery {
+  if (!where || where.length === 0) {
+    throw new Error("DELETE 쿼리에는 최소 하나 이상의 where 조건이 반드시 필요합니다.");
+  }
+  if (where.length > 20) {
+    throw new Error("DELETE 쿼리의 where 조건은 최대 20개까지만 지정할 수 있습니다.");
+  }
+  const conditions = where.map(buildCondition);
+  return {
+    sql: `DELETE FROM ${quoteTableIdentifier(table)} WHERE ${conditions.map(({ sql }) => sql).join(" AND ")}`,
+    values: conditions.flatMap(({ values }) => values),
+  };
+}

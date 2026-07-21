@@ -1,4 +1,4 @@
-import mysql, { type Pool, type PoolOptions, type RowDataPacket } from "mysql2/promise";
+import mysql, { type Pool, type PoolOptions, type RowDataPacket, type ResultSetHeader } from "mysql2/promise";
 import type { DomainConfig, ServiceConfig } from "./config.js";
 
 export class DomainDatabase {
@@ -82,6 +82,15 @@ export class DomainDatabase {
       timeout: this.config.queryTimeoutMs,
     });
     return rows;
+  }
+
+  public async execute(domain: string, sql: string, values: unknown[]): Promise<ResultSetHeader> {
+    const [result] = await this.getPool(domain).query<ResultSetHeader>({
+      sql,
+      values,
+      timeout: this.config.queryTimeoutMs,
+    });
+    return result;
   }
 
   public async close(): Promise<void> {

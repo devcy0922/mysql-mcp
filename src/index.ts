@@ -15,7 +15,7 @@ import {
 import { OidcTokenVerifier } from "./auth/token-verifier.js";
 import { loadConfig, type DomainConfig } from "./config.js";
 import { DomainDatabase } from "./database.js";
-import { buildSelectQuery, type WhereCondition } from "./query.js";
+import { buildSelectQuery, buildInsertQuery, buildDeleteQuery, type WhereCondition } from "./query.js";
 
 const whereConditionSchema = z.object({
   column: z.string().min(1).max(128),
@@ -139,6 +139,56 @@ server.registerTool("mysql_select", {
   }
 });
 
+if (config.enableWrite) {
+  server.registerTool("mysql_insert", {
+    title: "데이터 삽입 (INSERT)",
+    description: "허용된 테이블에 단일 레코드를 삽입합니다. 쓰기 권한이 필요합니다.",
+    inputSchema: {
+      domain: z.string().min(1).max(64),
+      table: z.string().min(1).max(128),
+      record: z.record(z.any()),
+    },
+  }, async ({ domain, table, record }, extra) => {
+    const identity = auditIdentity(extra.authInfo);
+    try {
+      const selected = getAuthorizedDomain(domain, extra.authInfo);
+      assertScopes(extra.authInfo, config.oidc ? [config.oidc.writeScope, ...selected.requiredScopes] : [], authRequired);
+      database.assertAllowedTable(domain, table);
+      const query = buildInsertQuery(table, record);
+      const result = await database.execute(domain, query.sql, query.values);
+      await audit.write({ domain, operation: "insert", table, resultCount: result.affectedRows, outcome: "success", identity });
+      return jsonResult({ domain, table, affectedRows: result.affectedRows, insertId: result.insertId });
+    } catch (error) {
+      await audit.write({ domain, operation: "insert", table, outcome: auditOutcome(error), identity }).catch(() => undefined);
+      return errorResult(error);
+    }
+  });
+
+  server.registerTool("mysql_delete", {
+    title: "데이터 삭제 (DELETE)",
+    description: "허용된 테이블에서 지정된 조건에 만족하는 레코드를 삭제합니다. where 조건은 대형 사고를 막기 위해 반드시 필수입니다.",
+    inputSchema: {
+      domain: z.string().min(1).max(64),
+      table: z.string().min(1).max(128),
+      where: z.array(whereConditionSchema).min(1).max(20),
+    },
+  }, async ({ domain, table, where }, extra) => {
+    const identity = auditIdentity(extra.authInfo);
+    try {
+      const selected = getAuthorizedDomain(domain, extra.authInfo);
+      assertScopes(extra.authInfo, config.oidc ? [config.oidc.writeScope, ...selected.requiredScopes] : [], authRequired);
+      database.assertAllowedTable(domain, table);
+      const query = buildDeleteQuery(table, where as WhereCondition[]);
+      const result = await database.execute(domain, query.sql, query.values);
+      await audit.write({ domain, operation: "delete", table, resultCount: result.affectedRows, outcome: "success", identity });
+      return jsonResult({ domain, table, affectedRows: result.affectedRows });
+    } catch (error) {
+      await audit.write({ domain, operation: "delete", table, outcome: auditOutcome(error), identity }).catch(() => undefined);
+      return errorResult(error);
+    }
+  });
+}
+
 function originGuard(allowedOrigins: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const origin = req.header("origin");
@@ -172,6 +222,7 @@ async function startHttp(): Promise<HttpServer> {
     config.oidc.accessScope,
     config.oidc.metadataScope,
     config.oidc.readScope,
+    ...(config.enableWrite ? [config.oidc.writeScope] : []),
     ...config.domains.flatMap(({ requiredScopes }) => requiredScopes),
   ])];
 

@@ -29,6 +29,8 @@ AI 에이전트에게 데이터베이스 조회를 허용하면서도, 임의 SQ
 | `mysql_list_tables` | 특정 도메인의 허용된 테이블 존재 여부 확인 | `domain` |
 | `mysql_describe_table`| 지정 테이블의 스키마(컬럼, 데이터 형식, Key) 확인 | `domain`, `table` |
 | `mysql_select` | 구조화된 쿼리 조건으로 데이터 읽기 조회 | `domain`, `table`, `columns` (선택), `where` (선택), `limit` (선택) |
+| `mysql_insert` | (선택적) 허용된 테이블에 단일 레코드 데이터 삽입 | `domain`, `table`, `record` (객체) |
+| `mysql_delete` | (선택적) 지정 조건에 부합하는 레코드 삭제 | `domain`, `table`, `where` (배열, **필수**) |
 
 > **`mysql_select` 상세 설명:**
 > `where` 배열의 각 조건은 `column`, `operator`(`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `in`, `isNull`, `isNotNull`), `value`를 받아 MySQL Prepared Statement 파라미터로 안전하게 바인딩됩니다.
@@ -62,6 +64,8 @@ MYSQL_MCP_DOMAINS_JSON='{
 MYSQL_MCP_ORDERS_PASSWORD=your_secure_password
 MYSQL_MCP_DEFAULT_LIMIT=100
 MYSQL_MCP_MAX_LIMIT=1000
+MYSQL_MCP_ENABLE_WRITE=true
+MYSQL_MCP_OIDC_WRITE_SCOPE=mysql:write
 ```
 
 ### 2. 로컬 실행 (Node.js)
@@ -93,6 +97,7 @@ docker run --env-file .env -i mysql-mcp
 
 ## 🔒 운영 및 보안 고려사항
 
-* **최소 권한 원칙:** DB 커넥션 계정은 대상 데이터베이스의 `SELECT`, `SHOW VIEW` 등 최소한의 읽기 권한만 가져야 합니다.
+* **최소 권한 원칙:** DB 커넥션 계정은 대상 데이터베이스의 `SELECT`, `SHOW VIEW` 등 최소한의 필요한 권한만 가져야 합니다. 쓰기 기능을 활성화할 경우 해당 테이블의 `INSERT`, `DELETE` 권한을 추가로 부여하십시오.
+* **쓰기/삭제 분기 및 제한:** `MYSQL_MCP_ENABLE_WRITE=true`일 때만 생성/삭제 툴이 AI 에이전트에 노출됩니다. 또한 대량 삭제 방지를 위해 `mysql_delete`는 `where` 필터 조건이 비어 있으면 실행을 거부합니다.
 * **민감 정보 비노출:** 감사 로그는 JSON Lines 형식으로 생성되며, 보안 규정에 따라 비밀번호나 SQL 바인딩 값 원문, API Key는 로그에 기록되지 않습니다.
 * **제한 조치:** `limit`을 누락하면 기본값(100)이 적용되며, 100건을 초과하는 대량 조회를 시도할 때는 최소 1개 이상의 `where` 필터 조건이 필수로 제공되어야 쿼리가 수락됩니다.

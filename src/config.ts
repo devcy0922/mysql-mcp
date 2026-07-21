@@ -32,6 +32,7 @@ export interface OidcConfig {
   accessScope: string;
   metadataScope: string;
   readScope: string;
+  writeScope: string;
   usernameClaim: string;
 }
 
@@ -45,6 +46,7 @@ export interface ServiceConfig {
   connectionLimit: number;
   queryTimeoutMs: number;
   auditLogPath: string;
+  enableWrite: boolean;
 }
 
 interface DomainsDocument {
@@ -212,8 +214,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServiceConfig 
     accessScope: env.MYSQL_MCP_OIDC_ACCESS_SCOPE?.trim() || "mysql:mcp",
     metadataScope: env.MYSQL_MCP_OIDC_METADATA_SCOPE?.trim() || "mysql:metadata",
     readScope: env.MYSQL_MCP_OIDC_READ_SCOPE?.trim() || "mysql:read",
+    writeScope: env.MYSQL_MCP_OIDC_WRITE_SCOPE?.trim() || "mysql:write",
     usernameClaim: env.MYSQL_MCP_OIDC_USERNAME_CLAIM?.trim() || "preferred_username",
   } : undefined;
+  const enableWrite = env.MYSQL_MCP_ENABLE_WRITE?.trim().toLowerCase() === "true";
   return {
     domains,
     transport,
@@ -224,5 +228,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServiceConfig 
     connectionLimit: readInteger(env, "MYSQL_MCP_CONNECTION_LIMIT", 5, 1, 20),
     queryTimeoutMs: readInteger(env, "MYSQL_MCP_QUERY_TIMEOUT_MS", 10_000, 1_000, 60_000),
     auditLogPath: env.MYSQL_MCP_AUDIT_LOG_PATH ?? "/var/lib/mcp/logs/mysql-audit.jsonl",
+    enableWrite,
   };
 }

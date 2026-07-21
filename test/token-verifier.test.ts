@@ -39,6 +39,7 @@ test("OIDC access token의 서명, issuer, audience와 사용자 정보를 검�
     accessScope: "mysql:mcp",
     metadataScope: "mysql:metadata",
     readScope: "mysql:read",
+    writeScope: "mysql:write",
     usernameClaim: "preferred_username",
   };
   const verifier = new OidcTokenVerifier(oidcConfig);
