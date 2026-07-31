@@ -1,3 +1,5 @@
+import { MySqlDialect } from "./dialect.js";
+
 export const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export type WhereOperator = "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "like" | "in" | "isNull" | "isNotNull";
@@ -54,14 +56,14 @@ export function quoteTableIdentifier(table: string): string {
   return parts.map((part) => `\`${part}\``).join(".");
 }
 
+const defaultDialect = new MySqlDialect();
+
 export function buildSelectQuery(input: SelectInput): BuiltQuery {
-  const columns = input.columns?.length ? input.columns.map(quoteIdentifier).join(", ") : "*";
-  const conditions = input.where?.map(buildCondition) ?? [];
-  const where = conditions.length ? ` WHERE ${conditions.map(({ sql }) => sql).join(" AND ")}` : "";
-  return {
-    sql: `SELECT ${columns} FROM ${quoteTableIdentifier(input.table)}${where} LIMIT ?`,
-    values: [...conditions.flatMap(({ values }) => values), input.limit],
-  };
+  return defaultDialect.buildSelectQuery(input);
+}
+
+export function buildExplainQuery(input: SelectInput, format: "TRADITIONAL" | "JSON" = "TRADITIONAL"): BuiltQuery {
+  return defaultDialect.buildExplainQuery(input, format);
 }
 
 export function buildInsertQuery(table: string, record: Record<string, unknown>): BuiltQuery {

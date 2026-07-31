@@ -1,6 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSelectQuery, buildInsertQuery, buildDeleteQuery, quoteIdentifier } from "../src/query.js";
+import { buildSelectQuery, buildExplainQuery, buildInsertQuery, buildDeleteQuery, quoteIdentifier } from "../src/query.js";
+
+test("EXPLAIN TRADITIONAL 및 JSON 형태 생성을 검증한다", () => {
+  const result = buildExplainQuery({
+    table: "orders",
+    columns: ["id", "status"],
+    where: [{ column: "status", operator: "eq", value: "paid" }],
+    limit: 1000,
+  });
+  assert.equal(result.sql, "EXPLAIN SELECT `id`, `status` FROM `orders` WHERE `status` = ? LIMIT ?");
+  assert.deepEqual(result.values, ["paid", 1000]);
+
+  const jsonResult = buildExplainQuery({
+    table: "orders",
+    where: [{ column: "id", operator: "eq", value: 1 }],
+    limit: 10,
+  }, "JSON");
+  assert.equal(jsonResult.sql, "EXPLAIN FORMAT=JSON SELECT * FROM `orders` WHERE `id` = ? LIMIT ?");
+  assert.deepEqual(jsonResult.values, [1, 10]);
+});
 
 test("SELECT는 값 바인딩과 기본 식별자 인용을 사용한다", () => {
   const result = buildSelectQuery({

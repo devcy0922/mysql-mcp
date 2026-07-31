@@ -3,7 +3,7 @@ import type { SslOptions } from "mysql2";
 const MAX_SELECT_LIMIT = 1000;
 const DEFAULT_SELECT_LIMIT = 100;
 
-export type DatabaseEngine = "mysql" | "mariadb";
+export type DatabaseEngine = "mysql" | "mariadb" | "postgres" | "sqlite";
 
 export interface DomainConfig {
   domain: string;
@@ -97,12 +97,13 @@ function parseSsl(value: unknown, domain: string): SslOptions | undefined {
 function parseDomain(value: Record<string, unknown>): DomainConfig {
   const domain = requireString(value.domain, "domains[].domain");
   const engine = requireString(value.engine, `domains[${domain}].engine`);
-  if (engine !== "mysql" && engine !== "mariadb") {
-    throw new Error(`도메인 ${domain}의 engine은 mysql 또는 mariadb여야 합니다.`);
+  const validEngines: DatabaseEngine[] = ["mysql", "mariadb", "postgres", "sqlite"];
+  if (!validEngines.includes(engine as DatabaseEngine)) {
+    throw new Error(`도메인 ${domain}의 engine은 mysql, mariadb, postgres, sqlite 중 하나여야 합니다.`);
   }
   return {
     domain,
-    engine,
+    engine: engine as DatabaseEngine,
     host: requireString(value.host, `domains[${domain}].host`),
     port: parsePort(value.port, `domains[${domain}].port`),
     database: requireString(value.database, `domains[${domain}].database`),

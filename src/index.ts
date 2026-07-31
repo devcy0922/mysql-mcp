@@ -15,7 +15,7 @@ import {
 import { OidcTokenVerifier } from "./auth/token-verifier.js";
 import { loadConfig, type DomainConfig } from "./config.js";
 import { DomainDatabase } from "./database.js";
-import { buildSelectQuery, buildInsertQuery, buildDeleteQuery, type WhereCondition } from "./query.js";
+import { buildSelectQuery, buildExplainQuery, buildInsertQuery, buildDeleteQuery, type WhereCondition } from "./query.js";
 
 const whereConditionSchema = z.object({
   column: z.string().min(1).max(128),
@@ -135,6 +135,34 @@ server.registerTool("mysql_select", {
     return jsonResult({ domain, table, limit: requestedLimit, rowCount: records.length, rows: records });
   } catch (error) {
     await audit.write({ domain, operation: "select", table, requestedLimit, outcome: auditOutcome(error), identity }).catch(() => undefined);
+    return errorResult(error);
+  }
+});
+
+server.registerTool("mysql_explain", {
+  title: "쿼리 실행 계획 분석 (EXPLAIN)",
+  description: "지정된 테이블과 조건에 대한 MySQL/MariaDB 실행 계획(EXPLAIN)을 분석하여 인덱스 사용 여부 및 성능 지표를 반환합니다.",
+  inputSchema: {
+    domain: z.string().min(1).max(64),
+    table: z.string().min(1).max(128),
+    columns: z.array(z.string().min(1).max(128)).min(1).max(50).optional(),
+    where: z.array(whereConditionSchema).min(1).max(20).optional(),
+    limit: z.number().int().min(1).max(1000).optional(),
+    format: z.enum(["TRADITIONAL", "JSON"]).optional(),
+  },
+}, async ({ domain, table, columns, where, limit, format }, extra) => {
+  const identity = auditIdentity(extra.authInfo);
+  const requestedLimit = limit ?? config.defaultLimit;
+  try {
+    const selected = getAuthorizedDomain(domain, extra.authInfo);
+    assertScopes(extra.authInfo, config.oidc ? [config.oidc.readScope, ...selected.requiredScopes] : [], authRequired);
+    database.assertAllowedTable(domain, table);
+    const query = buildExplainQuery({ table, columns, where: where as WhereCondition[] | undefined, limit: requestedLimit }, format);
+    const records = await database.select(domain, query.sql, query.values);
+    await audit.write({ domain, operation: "explain", table, requestedLimit, resultCount: records.length, outcome: "success", identity });
+    return jsonResult({ domain, table, format: format ?? "TRADITIONAL", explain: records });
+  } catch (error) {
+    await audit.write({ domain, operation: "explain", table, requestedLimit, outcome: auditOutcome(error), identity }).catch(() => undefined);
     return errorResult(error);
   }
 });
