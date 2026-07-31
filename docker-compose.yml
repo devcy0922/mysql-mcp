@@ -1,0 +1,24 @@
+services:
+  mysql-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mysql-mcp
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MYSQL_MCP_AUDIT_LOG_PATH=/var/lib/mcp/logs/mysql-mcp-audit.jsonl
+    volumes:
+      - mysql-mcp-runtime:/var/lib/mcp
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+volumes:
+  mysql-mcp-runtime:
+    name: mysql-mcp-runtime-data
