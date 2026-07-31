@@ -7,18 +7,17 @@ services:
     stdin_open: true
     tty: true
     restart: unless-stopped
+    # 호스트에서 bind mount된 로그를 바로 읽을 수 있도록 호스트 UID/GID로 실행한다.
+    user: "${MYSQL_MCP_UID:-1000}:${MYSQL_MCP_GID:-1000}"
     env_file:
       - .env
     environment:
       - MYSQL_MCP_AUDIT_LOG_PATH=/var/lib/mcp/logs/mysql-mcp-audit.jsonl
     volumes:
-      - mysql-mcp-runtime:/var/lib/mcp
+      # 레포 내 var/logs로 bind mount해 감사 로그를 호스트에서 바로 확인 가능하게 한다.
+      - ./var/logs:/var/lib/mcp/logs
     deploy:
       resources:
         limits:
           memory: 256M
           cpus: "0.5"
-
-volumes:
-  mysql-mcp-runtime:
-    name: mysql-mcp-runtime-data
